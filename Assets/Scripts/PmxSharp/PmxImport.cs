@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace PmxSharp
 {
@@ -400,12 +401,15 @@ namespace PmxSharp
 			GameObject parent = new GameObject("Model");
 			Material baseOpaque = Resources.Load<Material>("Materials/DefaultMaterial");
 			Material baseTransparent = Resources.Load<Material>("Materials/DefaultMaterialTransparent");
+			Material baseFade = Resources.Load<Material>("Materials/DefaultMaterialFade");
+			Material baseCutout = Resources.Load<Material>("Materials/DefaultMaterialCutout");
 
 			for (int i = 0; i < Materials.Count; ++i)
 			{
 				PmxMaterial mat = Materials[i];
 
-				// Mesh
+				// MESH
+
 				List<PmxVertex> vert = new List<PmxVertex>();   // List of vertices that make up the sub-model
 				List<int> tri = new List<int>();                // Every index corresponds to an index in vert
 
@@ -426,8 +430,9 @@ namespace PmxSharp
 				mesh.uv = PmxVertex.GetUVs(vert).ToArray();
 				mesh.triangles = tri.ToArray();
 
-				// Material
-				// Try to load the texture
+				// MATERIAL
+
+				// Texture
 				Texture2D tex = null;
 				if (!string.IsNullOrEmpty(mat.DiffuseTexturePath))
 				{
@@ -443,35 +448,61 @@ namespace PmxSharp
 					}
 				}
 
-				// Decide whether to use transparency
-				bool transparent = mat.DiffuseColor.a < 1;
-				if (!(tex == null || transparent))
+				// Execute early rendering mode directives
+				RenderModeDirective.RenderMode mode = RenderModeDirective.RenderMode.Opaque;
+				foreach (RenderModeDirective dir in mat.Directives.OfType<RenderModeDirective>())
 				{
-					foreach (Color p in tex.GetPixels())
-					{
-						if (p.a < 1)
-						{
-							transparent = true;
-							break;
-						}
-					}
+					mode = dir.Mode;
+					if (dir.AutoDetect)
+						if (!PmxMaterial.IsTransparent(mat, tex, dir.Threshold))
+							mode = RenderModeDirective.RenderMode.Opaque;
 				}
 
-				Material material = Material.Instantiate<Material>(transparent ? baseTransparent : baseOpaque);
+				// Set up material
+
+				Material material;
+				switch (mode)
+				{
+					case RenderModeDirective.RenderMode.Cutout:
+						material = Material.Instantiate<Material>(baseCutout);
+						break;
+					case RenderModeDirective.RenderMode.Fade:
+						material = Material.Instantiate<Material>(baseFade);
+						break;
+					case RenderModeDirective.RenderMode.Transparent:
+						material = Material.Instantiate<Material>(baseTransparent);
+						break;
+					default:
+						material = Material.Instantiate<Material>(baseOpaque);
+						break;
+				}
+
 				material.name = mat.NameJapanese;
 				material.color = mat.DiffuseColor;
 				if (tex != null)
 					material.mainTexture = tex;
 
+				// Execute directives
 				foreach (MaterialDirective dir in mat.Directives)
 				{
 					dir.Execute(material);
 					Debug.LogFormat("Execute directive {0} on material {1}", dir.DirectiveString, mat.NameJapanese);
 				}
 
+				// Set up GameObject and components
 				GameObject o = new GameObject(string.Format("{0} ({1})", Name, mat.NameJapanese));
 				o.AddComponent<MeshFilter>().sharedMesh = mesh;
-				o.AddComponent<MeshRenderer>().sharedMaterial = material;
+				MeshRenderer renderer = o.AddComponent<MeshRenderer>();
+				renderer.sharedMaterial = material;
+				renderer.shadowCastingMode = mat.HasFlag(PmxMaterial.MaterialFlags.CastShadow | PmxMaterial.MaterialFlags.GroundShadow) ? ShadowCastingMode.On : ShadowCastingMode.Off;
+				renderer.receiveShadows = mat.HasFlag(PmxMaterial.MaterialFlags.ReceiveShadow);
+
+				// Execute renderer directives
+				foreach(MaterialDirective dir in mat.Directives)
+				{
+					dir.Execute(renderer);
+				}
+
 				o.transform.SetParent(parent.transform);
 			}
 

@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Globalization;
-using System.Text.RegularExpressions;
 using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace PmxSharp
 {
@@ -30,7 +31,7 @@ namespace PmxSharp
 				{ TextureFileFormat.HDR, new byte[] { 0x23, 0x3F, 0x52, 0x41, 0x44, 0x49, 0x41, 0x4E, 0x43, 0x45, 0x0A } }
 			};
 
-			TgaFooterSignature = new byte[] { 0x54, 0x52, 0x55, 0x45, 0x56, 0x49, 0x53, 0x49, 0x4F, 0x4E, 0x2D, 0x58, 0x46, 0x49, 0x4C, 0x45, 0x2E, 0x00 };	// fuck TGA
+			TgaFooterSignature = new byte[] { 0x54, 0x52, 0x55, 0x45, 0x56, 0x49, 0x53, 0x49, 0x4F, 0x4E, 0x2D, 0x58, 0x46, 0x49, 0x4C, 0x45, 0x2E, 0x00 }; // fuck TGA
 		}
 
 		/// <summary>
@@ -42,15 +43,15 @@ namespace PmxSharp
 		{
 			TextureFileFormat format = TextureFileFormat.Unknown;
 
-			foreach(KeyValuePair<TextureFileFormat, byte[]> kvp in ImageFileHeaders)
+			foreach (KeyValuePair<TextureFileFormat, byte[]> kvp in ImageFileHeaders)
 			{
-				if(data.Take(kvp.Value.Length).SequenceEqual(kvp.Value))
+				if (data.Take(kvp.Value.Length).SequenceEqual(kvp.Value))
 				{
 					format = kvp.Key;
 				}
 			}
 
-			if(format == TextureFileFormat.TGA)
+			if (format == TextureFileFormat.TGA)
 			{
 				// No, seriously, FUCK TGA
 				if (!data.Skip(data.Length - TgaFooterSignature.Length).SequenceEqual(TgaFooterSignature))
@@ -67,7 +68,9 @@ namespace PmxSharp
 	/// </summary>
 	public abstract class MaterialDirective
 	{
-		public abstract void Execute(Material material);
+		public virtual void Execute(Material material) { }
+		public virtual void ExecuteEarly(Material material) { }
+		public virtual void Execute(Renderer renderer) { }
 		public string DirectiveString { get; private set; }
 		public MaterialDirective(string raw)
 		{
@@ -87,7 +90,7 @@ namespace PmxSharp
 
 		public static PropertyType ParsePropertyType(string s)
 		{
-			switch(s.ToLower())
+			switch (s.ToLower())
 			{
 				case "float":
 					return PropertyType.Float;
@@ -267,29 +270,90 @@ namespace PmxSharp
 		public enum RenderMode { Opaque, Cutout, Fade, Transparent }
 		public RenderMode Mode { get; }
 		public bool AutoDetect { get; }
-		public override void Execute(Material material)
-		{
+		public float Threshold { get; }
 
-		}
-
-		public RenderModeDirective(string raw, string mode, bool autoDetect) : base(raw)
+		public RenderModeDirective(string raw, string mode, bool autoDetect, float threshold = 1.0f) : base(raw)
 		{
 			string m = mode.ToLowerInvariant();
 			if (autoDetect && m == "opaque") throw new ArgumentException("Autodetect cannot be used if the defined render mode is opaque.", "mode");
 			switch (m)
 			{
 				case "opaque":
+					Mode = RenderMode.Opaque;
 					break;
 				case "cutout":
+					Mode = RenderMode.Cutout;
 					break;
 				case "fade":
+					Mode = RenderMode.Fade;
 					break;
 				case "transparent":
+					Mode = RenderMode.Transparent;
 					break;
 				default:
 					throw new ArgumentException(string.Format("{0} is not a valid render mode.", mode), "mode");
 			}
 			AutoDetect = autoDetect;
+			Threshold = threshold;
+		}
+	}
+
+	/// <summary>
+	/// Directive that overrides the shadow casting and receiving behaviour of the material's renderer component.
+	/// </summary>
+	public sealed class ShadowModeDirective : MaterialDirective
+	{
+		public enum ShadowOperation { Cast, Receive }
+		public ShadowOperation Operation { get; }
+		public bool Detect { get; }
+		public ShadowCastingMode Mode { get; }
+		public ShadowModeDirective(string raw, string operation, string mode, PmxMaterial.MaterialFlags flags) : base(raw)
+		{
+			Detect = false;
+			switch (operation.ToLower())
+			{
+				case "cast":
+					Operation = ShadowOperation.Cast;
+					switch (mode.ToLower())
+					{
+						case "off":
+							Mode = ShadowCastingMode.Off;
+							break;
+						case "on":
+							Mode = ShadowCastingMode.On;
+							break;
+						case "double":
+							Mode = ShadowCastingMode.TwoSided;
+							break;
+						case "doubleauto":
+							Mode = ((flags & PmxMaterial.MaterialFlags.CastShadow) != 0) ? ShadowCastingMode.TwoSided : ShadowCastingMode.Off;
+							break;
+						case "shadowonly":
+							Mode = ShadowCastingMode.ShadowsOnly;
+							break;
+					}
+					break;
+				case "receive":
+					Operation = ShadowOperation.Receive;
+					switch (mode.ToLower())
+					{
+						case "on":
+							Mode = ShadowCastingMode.On;
+							break;
+						case "off":
+							Mode = ShadowCastingMode.Off;
+							break;
+					}
+					break;
+				default: throw new ArgumentException(string.Format("{0} is not a valid shadow operation.", operation), "operation");
+			}
+		}
+		public override void Execute(Renderer renderer)
+		{
+			if (Operation == ShadowOperation.Cast)
+				renderer.shadowCastingMode = Mode;
+			else
+				renderer.receiveShadows = Mode == ShadowCastingMode.On;
 		}
 	}
 	#endregion
@@ -328,7 +392,7 @@ namespace PmxSharp
 					{
 						tex = TGALoader.LoadTGA(new MemoryStream(data));
 					}
-					catch(EndOfStreamException ex)
+					catch (EndOfStreamException ex)
 					{
 						throw new NotImplementedException(string.Format("Tried reading after end of stream. The file is probably compressed, which is not currently supported. Path: {0}.", path), ex);
 					}
@@ -340,6 +404,28 @@ namespace PmxSharp
 			}
 
 			return tex;
+		}
+		/// <summary>
+		/// Determines whether the specified material should be treated as transparent or opaque.
+		/// </summary>
+		/// <param name="material">The material in question.</param>
+		/// <param name="texture">The material's diffuse texture, if any.</param>
+		/// <param name="threshold">The threshold below which a color is considered transparent.</param>
+		/// <returns>True if the diffuse color, or at least one pixel in the diffuse texture, is transparent. False otherwise.</returns>
+		public static bool IsTransparent(PmxMaterial material, Texture2D texture = null, float threshold = 1.0f)
+		{
+			if (material.DiffuseColor.a < threshold)
+				return true;
+			if (texture != null)
+			{
+				Color[] pixels = texture.GetPixels();
+				for (int i = 0; i < pixels.Length; ++i)
+				{
+					if (pixels[i].a < threshold)
+						return true;
+				}
+			}
+			return false;
 		}
 
 		#region Properties
@@ -419,6 +505,15 @@ namespace PmxSharp
 				ReadDirectives();
 			}
 		}
+		/// <summary>
+		/// Determines whether at least one of the specified flags is set in the material.
+		/// </summary>
+		/// <param name="flags">The flags to look for.</param>
+		/// <returns></returns>
+		public bool HasFlag(MaterialFlags flag)
+		{
+			return (Flags & flag) != 0;
+		}
 		#endregion
 		#region Directives
 		public MaterialDirective[] Directives { get; private set; }
@@ -435,7 +530,7 @@ namespace PmxSharp
 
 			// Find the block's beginning and begin processing.
 			string block = Regex.Match(_note, @"\[begin\]([\s\S]*)$", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.ECMAScript).Groups[1].Value;
-			foreach(Match match in Regex.Matches(block, @"\[(.*?)\]", RegexOptions.IgnoreCase))
+			foreach (Match match in Regex.Matches(block, @"\[(.*?)\]", RegexOptions.IgnoreCase))
 			{
 				string dir = match.Groups[1].Value;
 				// If [end] is reached, finish processing.
@@ -449,7 +544,7 @@ namespace PmxSharp
 				string name = split[0];
 				string[] args = split.Skip(1).ToArray();
 
-				switch(name.ToLower())
+				switch (name.ToLower())
 				{
 					case "set":
 						SetValueDirective.PropertyType type = SetValueDirective.ParsePropertyType(args[0]);
@@ -489,11 +584,17 @@ namespace PmxSharp
 						break;
 					case "visible":
 						break;
+					case "shadow":
+						list.Add(new ShadowModeDirective(dir, args[0], args[1], Flags));
+						break;
 					case "queue":
 						list.Add(new QueueDirective(dir, int.Parse(args[0])));
 						break;
 					case "rendermode":
-						list.Add(new RenderModeDirective(dir, args[0], Array.Exists(args, e => e.ToLower() == "auto")));
+						float threshold = 1.0f;
+						foreach(string arg in args)
+							float.TryParse(arg, out threshold);
+						list.Add(new RenderModeDirective(dir, args[0], Array.Exists(args, e => e.ToLower() == "auto"), threshold));
 						break;
 					default:
 						throw new MaterialDirectiveException(string.Format("Unknown directive name: {0}.", name), this, dir);

@@ -2,11 +2,15 @@
 using UnityEngine.EventSystems;
 using Crosstales.FB;
 using System.IO;
+using MUPS;
 
 namespace MUPS.Scene
 {
 	public class CameraPivotBehaviour : MonoBehaviour
 	{
+		// Singleton instance
+		public static CameraPivotBehaviour Instance { get; private set; }
+
 		// Inputs
 		private float _scroll;  // Zoom
 		private bool _rmb;      // Rotate
@@ -14,30 +18,76 @@ namespace MUPS.Scene
 		private bool _shift;    // Faster movement
 		private bool _ctrl;     // Slower movement
 		private bool _alt;      // Change movement type
-		private bool _tab;      // Toggle GUI
 		private float _deltaMult { get { return (_shift ? 3.0f : 1.0f) / (_ctrl ? 3.0f : 1.0f); } } // Movement speed multiplier
 		private bool _mouseControlsActive;  // Whether the cursor is currently on a UI element
 
 		// GameObjects
-		public GameObject camObject;
+		public Transform cameraSlider;
 		public Camera geometryCamera;
 		public Camera overlayCamera;
 		public Camera renderCamera;
-		public SettingsBehaviour settings;
 		private PointerEventData _pointerEvent;
+
+		// Screenshot
+		private bool _takeScreenshot = false;
+		private string _screenshotPath;
+
+		// Behaviour
+		public CameraData CameraData
+		{
+			get
+			{
+				return new CameraData(transform.position, transform.rotation, cameraSlider.localRotation.z, cameraSlider.localPosition.z, geometryCamera.fieldOfView);
+			}
+			set
+			{
+				transform.position = value.Position;
+				transform.rotation = value.Rotation;
+				cameraSlider.localPosition = new Vector3(0, 0, value.Distance);
+				cameraSlider.localRotation = Quaternion.Euler(0, 0, value.Roll);
+				geometryCamera.fieldOfView = value.FieldOfView;
+				overlayCamera.fieldOfView = value.FieldOfView;
+				renderCamera.fieldOfView = value.FieldOfView;
+			}
+		}
 
 		public void ResetCamera()
 		{
-			transform.localPosition = new Vector3(0, 1, 0);
+			transform.position = new Vector3(0, 1, 0);
 			transform.rotation = new Quaternion();
-			camObject.transform.localPosition = new Vector3(0, 0, -5);
-			camObject.transform.rotation = new Quaternion();
+			cameraSlider.localPosition = new Vector3(0, 0, -5);
+			cameraSlider.localRotation = new Quaternion();
 			geometryCamera.fieldOfView = 60.0f;
+			overlayCamera.fieldOfView = 60.0f;
+			renderCamera.fieldOfView = 60.0f;
 		}
 
-		#region MonoBehaviour stuff
+		public void RenderImage()
+		{
+			ExtensionFilter[] exts = new ExtensionFilter[] { new ExtensionFilter("PNG image", "png"), new ExtensionFilter("JPG image", "jpg", "jpeg"), new ExtensionFilter("TrueVision TGA", "tga"), new ExtensionFilter("OpenEXR", "exr") };
+			_screenshotPath = FileBrowser.SaveFile("Render image", SettingsBehaviour.Instance.Settings.ImageExportDirectory, "", exts);
+			if (!string.IsNullOrEmpty(_screenshotPath))
+			{
+				SettingsBehaviour.Instance.Settings.ImageExportDirectory = _screenshotPath;
+				_takeScreenshot = true;
+			}
+		}
 
-		void Update()
+		// Messages
+		private void Awake()
+		{
+			if(Instance == null)
+			{
+				Instance = this;
+			}
+			else if(Instance != this)
+			{
+				Destroy(Instance);
+				Instance = this;
+			}
+		}
+
+		private void Update()
 		{
 			// Get relevant controls
 			_scroll = Input.GetAxis("Mouse ScrollWheel");
@@ -46,7 +96,6 @@ namespace MUPS.Scene
 			_shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
 			_ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
 			_alt = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt) || Input.GetKey(KeyCode.AltGr);
-			_tab = Input.GetKeyDown(KeyCode.Tab);
 			_mouseControlsActive = !EventSystem.current.IsPointerOverGameObject();
 
 			// Pan camera
@@ -60,7 +109,7 @@ namespace MUPS.Scene
 				if (_alt)
 				{
 					// Rotate camera around local Z axis
-					camObject.transform.Rotate(new Vector3(0, 0, Input.GetAxis("Horizontal") * _deltaMult * 0.2f), Space.Self);
+					cameraSlider.Rotate(new Vector3(0, 0, Input.GetAxis("Horizontal") * _deltaMult * 0.2f), Space.Self);
 				}
 				else
 				{
@@ -76,43 +125,22 @@ namespace MUPS.Scene
 				if (_alt)
 				{
 					// Zoom with FOV
-					geometryCamera.fieldOfView += 5.0f * Mathf.Sign(_scroll) * _deltaMult;
+					geometryCamera.fieldOfView -= 5.0f * Mathf.Sign(_scroll) * _deltaMult;
 					overlayCamera.fieldOfView = renderCamera.fieldOfView = geometryCamera.fieldOfView;
 				}
 				else
 				{
 					// Zoom with position
-					camObject.transform.Translate(new Vector3(0, 0, 0.25f * Mathf.Sign(_scroll) * _deltaMult), Space.Self);
+					cameraSlider.Translate(new Vector3(0, 0, 0.25f * Mathf.Sign(_scroll) * _deltaMult), Space.Self);
 				}
 			}
-
-			// Toggle GUI
-			if (_tab)
-			{
-
-			}
 		}
 
-		void OnGUI()
-		{
-			GUI.Label(new Rect(10, 10, 200, 200), string.Format("LMB: {0}\nRMB: {1}\nMMB: {2}\n3: {3}\n4: {4}\nOn bottom panel: {5}\nCam distance: {6}", Input.GetMouseButton(0), _rmb, _mmb, Input.GetMouseButton(3), Input.GetMouseButton(4), _mouseControlsActive, camObject.transform.localPosition.z));
+		//private void OnGUI()
+		//{
+		//	GUI.Label(new Rect(10, 10, 200, 200), string.Format("LMB: {0}\nRMB: {1}\nMMB: {2}\n3: {3}\n4: {4}\nOn bottom panel: {5}\nCam distance: {6}", Input.GetMouseButton(0), _rmb, _mmb, Input.GetMouseButton(3), Input.GetMouseButton(4), _mouseControlsActive, cameraSlider.localPosition.z));
 
-		}
-		#endregion
-
-		private bool _takeScreenshot = false;
-		private string _screenshotPath;
-
-		public void RenderImage()
-		{
-			ExtensionFilter[] exts = new ExtensionFilter[] { new ExtensionFilter("PNG image", "png"), new ExtensionFilter("JPG image", "jpg", "jpeg"), new ExtensionFilter("TrueVision TGA", "tga"), new ExtensionFilter("OpenEXR", "exr") };
-			_screenshotPath = FileBrowser.SaveFile("Render image", settings.Settings.ImageExportDirectory, "", exts);
-			if (!string.IsNullOrEmpty(_screenshotPath))
-			{
-				settings.Settings.ImageExportDirectory = _screenshotPath;
-				_takeScreenshot = true;
-			}
-		}
+		//}
 
 		public void LateUpdate()
 		{
@@ -120,7 +148,7 @@ namespace MUPS.Scene
 			{
 				renderCamera.enabled = true;
 
-				RenderTexture target = new RenderTexture(new RenderTextureDescriptor(Screen.width, Screen.height, RenderTextureFormat.ARGB32));
+				RenderTexture target = new RenderTexture(new RenderTextureDescriptor(SettingsBehaviour.Instance.Settings.RenderWidth, SettingsBehaviour.Instance.Settings.RenderHeight, RenderTextureFormat.ARGB32));
 				renderCamera.targetTexture = target;
 				Texture2D img = new Texture2D(target.width, target.height, TextureFormat.RGBA32, false);
 				renderCamera.Render();
@@ -130,7 +158,7 @@ namespace MUPS.Scene
 				RenderTexture.active = null;
 
 				string ext = Path.GetExtension(_screenshotPath).ToLower();
-				switch(ext)
+				switch (ext)
 				{
 					case ".png":
 						File.WriteAllBytes(_screenshotPath, img.EncodeToPNG());

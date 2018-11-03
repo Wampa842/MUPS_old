@@ -17,6 +17,8 @@ namespace MUPS.Scene
 		public GameObject modelListContent;
 		public GizmoBehaviour gizmoRoot;
 		public Transform modelAttachment;
+		public Camera mainCamera;
+		public Camera renderCamera;
 
 		private ColorBlock _selectedButtonColors;
 
@@ -97,7 +99,6 @@ namespace MUPS.Scene
 			SelectModel(-1);
 		}
 
-
 		public GameObject LoadFile(string path)
 		{
 			if (string.IsNullOrEmpty(path))
@@ -134,6 +135,19 @@ namespace MUPS.Scene
 				SettingsBehaviour.Instance.Settings.ModelImportDirectory = System.IO.Path.GetDirectoryName(path);
 				ScanModels();
 				SelectModel(Models.Length - 1);
+			}
+		}
+
+		public void LoadSkybox()
+		{
+			ExtensionFilter[] exts = new ExtensionFilter[] { new ExtensionFilter("OpenEXR", "exr"), new ExtensionFilter("Radiance HDR", "hdr"), new ExtensionFilter("Portable Network Graphics", "png") };
+			string path = FileBrowser.OpenSingleFile("Open skybox file", SettingsBehaviour.Instance.Settings.SkyboxImportDirectory, exts);
+			if (!string.IsNullOrEmpty(path))
+			{
+				RenderSettings.skybox = Resources.Load<Material>("Materials/SkyboxLatLong");
+				Texture2D tex = new Texture2D(2, 2);
+				tex.LoadImage(System.IO.File.ReadAllBytes(path));
+				RenderSettings.skybox.mainTexture = tex;
 			}
 		}
 

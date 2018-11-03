@@ -7,6 +7,7 @@
 	- [copy](#copy)
 	- [keyword](#keyword)
 	- [rename](#rename)
+	- [shadow](#shadow)
 	- [delete](#delete)
 	- [visible](#visible)
 	- [queue](#queue)
@@ -35,18 +36,33 @@ Any text that is inside a block, but is not surrounded by square brackets, is ig
 
 
 ## Directives
-### set
+
+Directives marked with TBI (to be implemented) are currently ignored.
+
+Formal definitions follow these rules:
+
+|Rule|Formal example|Actual example
+|---|---|---
+|Parameters surrounded by \<angle brackets\> must be replaced with custom values.|[queue **\<number\>**]|[queue **2000**]
+|Parameters without angle brackets are verbatim.|[visible **true**\|false]|[visible **true**]
+|Parameters separated by the pipe character (\|) are a mutually exclusive choice.|[visible **true\|false**]|[visible **true**]
+|If a parameter is followed by an ellipsis (...), it means that the directive accepts more than one parameters in the same place.|[set \<type\> \<name\> **\<parameters...\>**]|[set color _Color **1 0.5 0.3 1**]
+
+
+---
+
+### **set**
 	[set <type> <name> <parameters...>]
 Set causes the importer to set the material's property called `<name>` of type `<type>` to the value defined by the rest of the parameters. **The `name` parameter is case-sensitive.** The following types and syntaxes are supported:
 
 |Type|Syntax|Note
 |---|---|---
-|Float|`[set float name value]`|Correct format is `12.34`. Use decimal point, don't use F suffix.
-|Integer|`[set int name value]`
-|Color RGBA|`[set color name R G B A]`|Values must be between 0 and 1.
-|Color RGB|`[set color name R G B]`|This assumes alpha is 1.
-|Texture|`[set texture name path]`\*|This loads the file at `path` and sets it as the specified texture.
-|Keyword|`[set keyword name value]`|See below.
+|Float|`[set float <name> <value>]`|Correct format is `12.34`. Use decimal point, don't use F suffix.
+|Integer|`[set int <name> <value>]`
+|Color RGBA|`[set color <name> <R> <G> <B> <A>]`|Values must be between 0 and 1.
+|Color RGB|`[set color <name> <R> <G> <B>]`|This assumes alpha is 1.
+|Texture|`[set texture <name> <path>]`\*|This loads the file at `path` and sets it as the specified texture.
+|Keyword|`[set keyword <name> <value>]`|See below.
 
 <sub>\*: The `path` parameter may contain whitespace characters - it will include the complete string ending with the character before the closing bracket. Leading and trailing whitespaces will be trimmed.</sub>
 
@@ -66,7 +82,7 @@ Example:
 The first directive sets the material's main color to red. The second one sets its opacity to 30%.
 
 ---
-### copy
+### **copy**
 	[copy <source> <destination>]
 Copies the value marked by `source` into the property that has the name `destination`. Mis-matching source and destination types will cause an error. **The `destination` parameter is case-sensitive.** The following keywords (and types) are available:
 
@@ -99,12 +115,9 @@ Example:
 This copies the PMX material's smoothness to the Standard material's property.
 
 ---
-### keyword
+### **keyword**
 	[keyword enable|disable|on|off <name>]
-Enables or disables the material's specified keyword. **The `name` parameter is case-sensitive.** The following keywords are available for the Standard material:
-|Keyword|Note
-|---|---
-|_EMISSION|Use emissive color for bloom effect.
+Enables or disables the material's specified keyword. **The `name` parameter is case-sensitive.** For the available keywords and their default state, look at the [appendix](#appendix).
 
 Example:
 
@@ -113,25 +126,49 @@ Example:
 This directive enables emission (bloom) on the Standard material.
 
 ---
-### rename
-	[rename value]
+### **rename**
+#### TBI
+	[rename <value>]
 Forces the importer to rename the GameObject that holds the material's sub-object to the specified string. This can be useful if the encoding of the material's real name is causing issues.
 
 The `value` parameter may contain whitespace characters - it will include the complete string ending with the character before the closing bracket. Leading and trailing whitespaces will be trimmed.
 
 ---
-### delete
+### **shadow**
+	[shadow cast off|on|double|doubleauto|shadowonly]
+	[shadow receive on|off]
+Overrides the PMX material's shadow casting and receiving and forces the renderer to use the specified mode.
+
+Shadow casting modes:
+|Parameter|Description
+|---|---
+|`off`|Shadow casting is disabled.
+|`on`|Shadow casting is enabled. Only front faces will cast shadows.
+|`double`|Shadow casting is enabled. Both the front and back faces cast shadows - useful for interiors.
+|`doubleauto`|Same as `double`, but only if shadow casting is enabled in the PMX material.
+|`shadowonly`|Only draws shadows, the object itself is invisible.
+
+Default: single-sided shadow casting is enabled only if it is enabled in the PMX material. Shadow receiving is enabled if it is enabled in the PMX material.
+
+---
+### **delete**
+#### TBI
 	[delete]
 Causes the sub-object to be skipped completely. Use it if the sub-object has no use outside MMD.
 
 ---
-### visible
+### **visible**
+#### TBI
 	[visible true|false]
 Causes the sub-object to be visible/hidden by enabling/disabling its MeshRenderer component.
 
-### queue
+Default: sub-object is visible.
+
+### **queue**
 	[queue <number>]
 Sets the material's place in the Unity render queue. The higher the value, the later it gets rendered.
+
+Default: inherited from the shader - see the [appendix](#appendix) for the default values.
 
 Example:
 
@@ -140,22 +177,26 @@ Example:
 This will cause the material to be rendered after geometry (2000), but before alpha test materials (2450).
 
 ---
-### rendermode
+### **rendermode**
 	[rendermode opaque|cutout|fade|transparent]
-    [rendermode cutout|fade|transparent auto]
+    [rendermode cutout|fade|transparent auto <threshold>]
 This directive is executed before the material is created. It decides which render mode should be used for the material and chooses the preset accordingly.
 
 The first variant simply forces the importer to use the specified preset.
 
-The second variant, where the `auto` parameter is defined, makes the importer choose. If the color isn't opaque, or the material has a texture and at least one pixel in it isn't opaque, it uses the preset specified in the second parameter. Otherwise it uses opaque.
+The second variant, where the `auto` (and optionally `threshold`) parameter is defined, makes the importer choose. If the color isn't opaque, or the material has a texture and at least one pixel in it isn't opaque, it uses the preset specified in the second parameter. Otherwise it uses opaque.
+
+If the `threshold` parameter is defined, the opacity test will use the (alpha < threshold) condition, otherwise it will use (alpha < 1).
 
 **Warning:** automatic detection will cause the importer program to loop through all pixels in the texture. In the case of a 4096-by-4096 texture, that means almost 17 million pixels. Be mindful of performance if you want to use this.
 
+Default: the importer automatically chooses between opaque and transparent using the (alpha < 1) condition.
+
 Example:
 
-	[rendermode transparent auto]
+	[rendermode cutout auto 0.8]
 	
-This will cause the importer to automatically choose between the opaque or transparent presets, which is the importer's default behaviour if the `rendermode` directive is not defined.
+This will cause the importer to automatically choose between the opaque or cutout presets where alpha below 0.4 is considered transparent.
 
 ## Example
 	This is a complete example of a PmxSharp material directive block.
@@ -206,6 +247,6 @@ The Standard shader defines the following properties:
 
 
 The Standard shader has the following keywords:
-|Name|Enabled by default|Description
+|Name|Default state|Description
 |---|---|---
-|_EMISSION|no|Enables emissive (self-illumination) color and texture.
+|_EMISSION|off|Enables emissive (self-illumination) color and texture.
