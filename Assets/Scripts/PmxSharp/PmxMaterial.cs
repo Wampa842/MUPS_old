@@ -68,10 +68,29 @@ namespace PmxSharp
 	/// </summary>
 	public abstract class MaterialDirective
 	{
+		/// <summary>
+		/// When overridden in a derived class, this method is executed after the material has been created.
+		/// </summary>
+		/// <param name="material">The material to execute the directive on.</param>
 		public virtual void Execute(Material material) { }
+
+		/// <summary>
+		/// When overridden in a derived class, this method is executed before the material is created.
+		/// </summary>
+		/// <param name="material">The material to execute the directive on.</param>
 		public virtual void ExecuteEarly(Material material) { }
+
+		/// <summary>
+		/// When overridden in a derived class, this method is executed after the renderer has been created.
+		/// </summary>
+		/// <param name="renderer">The renderer to execute the directive on.</param>
 		public virtual void Execute(Renderer renderer) { }
+
+		/// <summary>
+		/// The raw content of the directive.
+		/// </summary>
 		public string DirectiveString { get; private set; }
+
 		public MaterialDirective(string raw)
 		{
 			DirectiveString = raw;
@@ -533,9 +552,13 @@ namespace PmxSharp
 			foreach (Match match in Regex.Matches(block, @"\[(.*?)\]", RegexOptions.IgnoreCase))
 			{
 				string dir = match.Groups[1].Value;
+
 				// If [end] is reached, finish processing.
 				if (dir.ToLower() == "end")
+				{
+					Directives = list.ToArray();
 					return;
+				}
 				// Throw an exception if two opening brackets follow each other.
 				if (dir.Contains("["))
 					throw new MaterialDirectiveException(string.Format("Expected closing bracket (]) before opening bracket ([) in directive {0}", dir), this, dir);
@@ -547,6 +570,8 @@ namespace PmxSharp
 				switch (name.ToLower())
 				{
 					case "set":
+						if (args.Length < 2)
+							throw new MaterialDirectiveException(string.Format("Invalid number of parameters. Expected at least 2, got {0}.", args.Length), this, dir);
 						SetValueDirective.PropertyType type = SetValueDirective.ParsePropertyType(args[0]);
 						object value = null;
 						switch (type)
@@ -573,9 +598,13 @@ namespace PmxSharp
 						list.Add(new SetValueDirective(dir, type, args[1], value));
 						break;
 					case "copy":
+						if (args.Length < 2)
+							throw new MaterialDirectiveException(string.Format("Invalid number of parameters. Expected 2, got {0}.", args.Length), this, dir);
 						list.Add(new CopyValueDirective(dir, this, args[0], args[1]));
 						break;
 					case "keyword":
+						if (args.Length < 2)
+							throw new MaterialDirectiveException(string.Format("Invalid number of parameters. Expected 2, got {0}.", args.Length), this, dir);
 						list.Add(new KeywordDirective(dir, args[0], args[1]));
 						break;
 					case "rename":
@@ -585,15 +614,25 @@ namespace PmxSharp
 					case "visible":
 						break;
 					case "shadow":
+						if (args.Length < 2)
+							throw new MaterialDirectiveException(string.Format("Invalid number of parameters. Expected 2, got {0}.", args.Length), this, dir);
 						list.Add(new ShadowModeDirective(dir, args[0], args[1], Flags));
 						break;
 					case "queue":
+						if (args.Length < 1)
+							throw new MaterialDirectiveException(string.Format("Invalid number of parameters. Expected 1, got {0}.", args.Length), this, dir);
 						list.Add(new QueueDirective(dir, int.Parse(args[0])));
 						break;
 					case "rendermode":
+						if (args.Length < 1)
+							throw new MaterialDirectiveException(string.Format("Invalid number of parameters. Expected 1, got {0}.", args.Length), this, dir);
 						float threshold = 1.0f;
-						foreach(string arg in args)
-							float.TryParse(arg, out threshold);
+						foreach (string arg in args)
+						{
+							if (float.TryParse(arg, out threshold))
+								break;
+						}
+
 						list.Add(new RenderModeDirective(dir, args[0], Array.Exists(args, e => e.ToLower() == "auto"), threshold));
 						break;
 					default:
@@ -642,7 +681,7 @@ namespace PmxSharp
 		/// <returns>Array of triangles that belong to the material.</returns>
 		public PmxTriangle[] Triangles(IEnumerable<PmxTriangle> coll)
 		{
-			return coll.Skip(FirstTriangle - 1).Take(TriangleCount).ToArray();
+			return coll.Skip(FirstTriangle).Take(TriangleCount).ToArray();
 		}
 		#endregion
 		#region Constructors

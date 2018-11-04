@@ -81,15 +81,7 @@ namespace PmxSharp
 			if (!(encoding is System.Text.UnicodeEncoding || encoding is System.Text.UTF8Encoding))
 				throw new System.ArgumentException("Unsupported encoding. PMX only uses Unicode (UTF-16 LE) and UTF-8.", "encoding");
 
-			try
-			{
-				return encoding.GetString(reader.ReadBytes(reader.ReadInt32()));
-			}
-			catch(Exception ex)
-			{
-				Debug.LogError(ex.ToString());
-			}
-			return "";
+			return encoding.GetString(reader.ReadBytes(reader.ReadInt32()));
 		}
 
 		/// <summary>
@@ -136,7 +128,7 @@ namespace PmxSharp
 			// Vertex indices are unsigned byte, unsigned short or signed int.
 			// All other indices are signed byte, signed short or signed int (to allow -1 to mark nil)
 			// All of them are cast to signed int here.
-			switch(size)
+			switch (size)
 			{
 				case 1:
 					if (type == PmxTypes.IndexType.Vertex)

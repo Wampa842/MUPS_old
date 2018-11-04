@@ -36,6 +36,8 @@ namespace PmxSharp
 		#endregion
 		public enum PmxVersion { Unknown, Pmd, Pmx20, Pmx21 }
 
+		private BinaryReader _reader;
+
 		public PmxVersion Version { get; private set; }
 		public Encoding TextEncoding { get; set; }
 		public string FilePath { get; private set; }
@@ -71,7 +73,8 @@ namespace PmxSharp
 		public PmxImport(FileStream stream) : this()
 		{
 			FilePath = stream.Name;
-			LoadPmx(new BinaryReader(stream));
+			_reader = new BinaryReader(stream);
+			LoadPmx(_reader);
 		}
 
 		/// <summary>
@@ -256,6 +259,8 @@ namespace PmxSharp
 				m.VertexCount = r.ReadInt32();
 				assignedVertices += m.VertexCount;
 				Materials.Add(m);
+
+
 			}
 			#endregion
 			r.Close(); return;
@@ -397,6 +402,8 @@ namespace PmxSharp
 		/// <returns>A parent GameObject that holds the sub-meshes in its children.</returns>
 		public GameObject GetGameObject()
 		{
+			bool cancel = false;
+
 			GameObject root = new GameObject(Name);
 			GameObject parent = new GameObject("Model");
 			Material baseOpaque = Resources.Load<Material>("Materials/DefaultMaterial");
@@ -412,7 +419,6 @@ namespace PmxSharp
 
 				List<PmxVertex> vert = new List<PmxVertex>();   // List of vertices that make up the sub-model
 				List<int> tri = new List<int>();                // Every index corresponds to an index in vert
-
 				foreach (PmxTriangle t in mat.Triangles(Triangles))
 				{
 					vert.Add(Vertices[t.Vertex1]);
@@ -444,7 +450,8 @@ namespace PmxSharp
 					}
 					catch (Exception ex)
 					{
-						Debug.LogError(string.Format("Error loading texture: {0}\nPath: {1}", ex.Message, path));
+						//MUPS.UI.Modal.Show(Screen.width - 200, Screen.height - 200, ex.Message, ex.ToString(), new MUPS.UI.ButtonDescriptor("Dismiss"), new MUPS.UI.ButtonDescriptor("Cancel loading", MUPS.UI.ButtonDescriptor.ColorPresets.Red, () => { cancel = true; }));
+						MUPS.UI.Modal.Show(Screen.width - 200, Screen.height - 200, ex.Message, ex.ToString(), new MUPS.UI.ButtonDescriptor("OK"));
 					}
 				}
 
@@ -486,7 +493,6 @@ namespace PmxSharp
 				foreach (MaterialDirective dir in mat.Directives)
 				{
 					dir.Execute(material);
-					Debug.LogFormat("Execute directive {0} on material {1}", dir.DirectiveString, mat.NameJapanese);
 				}
 
 				// Set up GameObject and components
@@ -495,19 +501,25 @@ namespace PmxSharp
 				MeshRenderer renderer = o.AddComponent<MeshRenderer>();
 				renderer.sharedMaterial = material;
 				renderer.shadowCastingMode = mat.HasFlag(PmxMaterial.MaterialFlags.CastShadow | PmxMaterial.MaterialFlags.GroundShadow) ? ShadowCastingMode.On : ShadowCastingMode.Off;
-				renderer.receiveShadows = mat.HasFlag(PmxMaterial.MaterialFlags.ReceiveShadow);
+				//renderer.receiveShadows = mat.HasFlag(PmxMaterial.MaterialFlags.ReceiveShadow);
 
 				// Execute renderer directives
-				foreach(MaterialDirective dir in mat.Directives)
+				foreach (MaterialDirective dir in mat.Directives)
 				{
 					dir.Execute(renderer);
 				}
 
 				o.transform.SetParent(parent.transform);
+				if (cancel)
+					break;
 			}
 
 			parent.transform.SetParent(root.transform);
-
+			if (cancel)
+			{
+				GameObject.Destroy(root);
+				return null;
+			}
 			return root;
 		}
 
@@ -525,6 +537,8 @@ namespace PmxSharp
 
 		public void Dispose()
 		{
+			if (_reader != null)
+				_reader.Close();
 		}
 	}
 }

@@ -107,9 +107,10 @@ namespace MUPS.Scene
 			}
 			else
 			{
+				PmxImport import = null;
 				try
 				{
-					PmxImport import = new PmxImport(path);
+					import = new PmxImport(path);
 					import.Resize(0.1f);
 					GameObject pmx = import.GetGameObject();
 					pmx.AddComponent<PmxModelBehaviour>().ModelName = import.Name;
@@ -117,9 +118,15 @@ namespace MUPS.Scene
 
 					return pmx;
 				}
-				catch (Exception)
+				catch (Exception ex)
 				{
+					ModalBehaviour.Instance.Show(Screen.width - 200, Screen.height - 200, ex.Message, ex.ToString());
 					return null;
+				}
+				finally
+				{
+					if (import != null)
+						import.Dispose();
 				}
 			}
 		}
@@ -135,19 +142,6 @@ namespace MUPS.Scene
 				SettingsBehaviour.Instance.Settings.ModelImportDirectory = System.IO.Path.GetDirectoryName(path);
 				ScanModels();
 				SelectModel(Models.Length - 1);
-			}
-		}
-
-		public void LoadSkybox()
-		{
-			ExtensionFilter[] exts = new ExtensionFilter[] { new ExtensionFilter("OpenEXR", "exr"), new ExtensionFilter("Radiance HDR", "hdr"), new ExtensionFilter("Portable Network Graphics", "png") };
-			string path = FileBrowser.OpenSingleFile("Open skybox file", SettingsBehaviour.Instance.Settings.SkyboxImportDirectory, exts);
-			if (!string.IsNullOrEmpty(path))
-			{
-				RenderSettings.skybox = Resources.Load<Material>("Materials/SkyboxLatLong");
-				Texture2D tex = new Texture2D(2, 2);
-				tex.LoadImage(System.IO.File.ReadAllBytes(path));
-				RenderSettings.skybox.mainTexture = tex;
 			}
 		}
 
