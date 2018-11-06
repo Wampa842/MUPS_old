@@ -8,32 +8,13 @@ using UnityEngine.Rendering;
 
 namespace PmxSharp
 {
-
 	/// <summary>
 	/// Handles the parsing of PMX files.
 	/// </summary>
-	public sealed class PmxImport : IDisposable
+	public sealed class PmxImport : PmxNamedItem, IDisposable
 	{
-		#region Check flags
-		public static bool HasFlagsAll(int src, params int[] filters)
-		{
-			foreach (int filter in filters)
-			{
-				if ((src & filter) == 0)
-					return false;
-			}
-			return true;
-		}
-		public static bool HasFlagsAny(int src, params int[] filters)
-		{
-			foreach (int filter in filters)
-			{
-				if ((src & filter) != 0)
-					return true;
-			}
-			return false;
-		}
-		#endregion
+		[Flags]
+		public enum InfoField { None = 0, Header = 1, Vertex = 2, Triangle = 4, Mesh = 6, Texture = 8, Material = 16, Bone = 32, Morph = 64, Frame = 128, Rigidbody = 256, Joint = 512, SoftBody = 1024, Physics = 1792 }
 		public enum PmxVersion { Unknown, Pmd, Pmx20, Pmx21 }
 
 		private BinaryReader _reader;
@@ -41,9 +22,6 @@ namespace PmxSharp
 		public PmxVersion Version { get; private set; }
 		public Encoding TextEncoding { get; set; }
 		public string FilePath { get; private set; }
-		public string NameJapanese { get; set; }
-		public string NameEnglish { get; set; }
-		public string Name { get { return string.IsNullOrEmpty(NameEnglish) ? NameJapanese : NameEnglish; } }
 		public string InfoJapanese { get; set; }
 		public string InfoEnglish { get; set; }
 		public byte AdditionalUVCount { get; private set; }
@@ -53,7 +31,12 @@ namespace PmxSharp
 		public List<string> Textures { get; private set; }
 		public List<PmxMaterial> Materials { get; private set; }
 		public List<PmxBone> Bones { get; private set; }
+		public List<PmxMorph> Morphs { get; private set; }
+		public List<PmxDisplayFrame> DisplayFrames { get; private set; }
+		public List<PmxRigidbody> Rigidbodies { get; private set; }
+		public List<PmxJoint> Joints { get; private set; }
 
+		// Constructors
 		/// <summary>
 		/// Creates an empty importer.
 		/// </summary>
@@ -86,6 +69,7 @@ namespace PmxSharp
 			FilePath = path;
 		}
 
+		// Loading
 #pragma warning disable 0162
 		/// <summary>
 		/// Read and process the file.
@@ -96,7 +80,7 @@ namespace PmxSharp
 			#region Header
 			// Signature (4)
 			byte[] sig = r.ReadBytes(PmxConstants.SignatureLength);
-			if (!sig.ValidateSignature())
+			if (!sig.ValidatePmxSignature())
 			{
 				throw new PmxSignatureException(sig);
 			}
@@ -263,74 +247,24 @@ namespace PmxSharp
 
 			}
 			#endregion
-			r.Close(); return;
 			#region Bone data
 			Bones = new List<PmxBone>(r.ReadInt32());
 			for (int i = 0; i < Bones.Capacity; ++i)
 			{
-				//PmxBone bone = new PmxBone(r.ReadPmxString(TextEncoding), r.ReadPmxString(TextEncoding));
-				PmxBone bone = new PmxBone();
-				r.ReadPmxString(TextEncoding);
-				r.ReadPmxString(TextEncoding);
-
-				bone.Position = r.ReadVector3();
-				bone.Parent = r.ReadIndex(PmxTypes.IndexType.Bone);
-				bone.Layer = r.ReadInt32();
-				bone.Flags = (PmxBone.BoneFlags)r.ReadUInt16();
-				// Tail
-				if (HasFlagsAny((int)bone.Flags, (int)PmxBone.BoneFlags.TailIsIndex))
-				{
-					bone.TailIndex = r.ReadIndex(PmxTypes.IndexType.Bone);
-				}
-				else
-				{
-					bone.TailPosition = r.ReadVector3();
-				}
-				// Inherit
-				if (HasFlagsAny((int)bone.Flags, (int)PmxBone.BoneFlags.InheritRotation, (int)PmxBone.BoneFlags.InheritTranslation))
-				{
-					bone.InheritFromIndex = r.ReadIndex(PmxTypes.IndexType.Bone);
-					bone.InheritWeight = r.ReadSingle();
-				}
-				// Fixed axis
-				if (HasFlagsAny((int)bone.Flags, (int)PmxBone.BoneFlags.FixedAxis))
-				{
-					bone.FixedAxis = r.ReadVector3();
-				}
-				// Local transformation
-				if (HasFlagsAny((int)bone.Flags, (int)PmxBone.BoneFlags.LocalTransform))
-				{
-					bone.LocalX = r.ReadVector3();
-					bone.LocalZ = r.ReadVector3();
-				}
-				// Outside parent
-				if (HasFlagsAny((int)bone.Flags, (int)PmxBone.BoneFlags.ExternalDeform))
-				{
-					bone.ExternalParentIndex = r.ReadIndex(PmxTypes.IndexType.Bone);
-				}
-				// IK
-				if (HasFlagsAny((int)bone.Flags, (int)PmxBone.BoneFlags.IK))
-				{
-					bone.IK = new PmxIK()
-					{
-						TargetIndex = r.ReadIndex(PmxTypes.IndexType.Bone),
-						Loop = r.ReadInt32(),
-						Limit = r.ReadSingle(),
-						Links = new List<PmxIKLink>(r.ReadInt32())
-					};
-					for (int j = 0; j < bone.IK.Links.Capacity; ++j)
-					{
-						bone.IK.Links.Add(new PmxIKLink(r.ReadIndex(PmxTypes.IndexType.Bone), r.ReadByte() == 1, r.ReadVector3(), r.ReadVector3()));
-					}
-				}
-
+				PmxBone bone = r.ReadPmxBone(TextEncoding);
+				bone.Index = Bones.Count;
 				Bones.Add(bone);
 			}
 			#endregion
-			// SKIP FROM HERE
 			#region Morph data
-
+			Morphs = new List<PmxMorph>(r.ReadInt32());
+			for (int i = 0; i < Morphs.Capacity; ++i)
+			{
+				Morphs.Add(r.ReadPmxMorph(TextEncoding));
+			}
 			#endregion
+			// SKIP FROM HERE
+			r.Close(); return;
 			#region Frame data
 
 			#endregion
@@ -345,57 +279,27 @@ namespace PmxSharp
 			#endregion
 		}
 #pragma warning restore 0162
-		/// <summary>
-		/// Formatted text displaying model information.
-		/// </summary>
-		public string Statistics
-		{
-			get
-			{
-				StringBuilder info = new StringBuilder()
-					.AppendFormat("PMX MODEL\nVersion {0}, Encoding {1}, Additional UV count {2}\n\n{3} ({4})\n", Version.ToString(), TextEncoding.GetType().ToString(), AdditionalUVCount, NameJapanese, NameEnglish)
-					.AppendFormat("Note (JP):\n{0}\nNote (EN)\n{1}\n\n", InfoJapanese, InfoEnglish)
-					.AppendFormat("Vertices: {0}\n", Vertices.Count)
-					.AppendFormat("Triangles: {0}\n", Triangles.Count)
-					.AppendFormat("Textures: {0}\n", Textures.Count);
-				foreach (string tex in Textures)
-				{
-					info.AppendFormat(" > {0}\n", tex);
-				}
-				info.AppendFormat("Materials: {0}\n", Materials.Count);
-				foreach (PmxMaterial mat in Materials)
-				{
-					info.AppendFormat(" > {0} ({1})\n", mat.NameJapanese, mat.NameEnglish);
-				}
-				info.AppendFormat("Bones: {0}\n", Bones.Count);
-				foreach (PmxBone b in Bones)
-				{
-					info.AppendFormat(" > {0} ({1})\n", b.NameJapanese, b.NameEnglish);
-				}
 
-				return info.ToString();
+		// Manipulation
+		/// <summary>
+		/// Scale the imported model by the given factor.
+		/// </summary>
+		/// <param name="factor">The multiplier to scale by.</param>
+		public void Resize(float factor)
+		{
+			foreach (PmxVertex v in Vertices)
+			{
+				v.Position *= factor;
+			}
+			foreach (PmxBone b in Bones)
+			{
+				b.Position *= factor;
+				if (b.TailPosition != null)
+					b.TailPosition *= factor;
 			}
 		}
 
-		/// <summary>
-		/// Convert the PMX model into a single Unity mesh with a single material.
-		/// </summary>
-		/// <returns>GameObject that holds the Mesh and a MeshRenderer.</returns>
-		public GameObject FullMesh()
-		{
-			GameObject o = new GameObject(string.IsNullOrEmpty(NameEnglish) ? NameJapanese : NameEnglish);
-			Mesh mesh = new Mesh();
-
-			mesh.vertices = PmxVertex.GetPositions(Vertices).ToArray();
-			mesh.normals = PmxVertex.GetNormals(Vertices).ToArray();
-			mesh.uv = PmxVertex.GetUVs(Vertices).ToArray();
-			mesh.triangles = PmxTriangle.GetVertices(Triangles).ToArray();
-
-			o.AddComponent<MeshFilter>().sharedMesh = mesh;
-			o.AddComponent<MeshRenderer>().material = new Material(Shader.Find("Standard"));
-			return o;
-		}
-
+		// Unity
 		/// <summary>
 		/// Convert the PMX model into Unity meshes with correct materials.
 		/// </summary>
@@ -405,12 +309,14 @@ namespace PmxSharp
 			bool cancel = false;
 
 			GameObject root = new GameObject(Name);
-			GameObject parent = new GameObject("Model");
+			GameObject modelParent = new GameObject("Model");
 			Material baseOpaque = Resources.Load<Material>("Materials/DefaultMaterial");
 			Material baseTransparent = Resources.Load<Material>("Materials/DefaultMaterialTransparent");
 			Material baseFade = Resources.Load<Material>("Materials/DefaultMaterialFade");
 			Material baseCutout = Resources.Load<Material>("Materials/DefaultMaterialCutout");
+			GameObject boneParent = new GameObject("Skeleton");
 
+			// Model
 			for (int i = 0; i < Materials.Count; ++i)
 			{
 				PmxMaterial mat = Materials[i];
@@ -442,17 +348,9 @@ namespace PmxSharp
 				Texture2D tex = null;
 				if (!string.IsNullOrEmpty(mat.DiffuseTexturePath))
 				{
-					string path = string.Empty;
-					try
-					{
-						path = Path.Combine(Path.GetDirectoryName(FilePath), mat.DiffuseTexturePath);
+					string path = Path.Combine(Path.GetDirectoryName(FilePath), mat.DiffuseTexturePath);
+					if (File.Exists(path))
 						tex = PmxMaterial.LoadTexture(path);
-					}
-					catch (Exception ex)
-					{
-						//MUPS.UI.Modal.Show(Screen.width - 200, Screen.height - 200, ex.Message, ex.ToString(), new MUPS.UI.ButtonDescriptor("Dismiss"), new MUPS.UI.ButtonDescriptor("Cancel loading", MUPS.UI.ButtonDescriptor.ColorPresets.Red, () => { cancel = true; }));
-						MUPS.UI.Modal.Show(Screen.width - 200, Screen.height - 200, ex.Message, ex.ToString(), new MUPS.UI.ButtonDescriptor("OK"));
-					}
 				}
 
 				// Execute early rendering mode directives
@@ -509,12 +407,21 @@ namespace PmxSharp
 					dir.Execute(renderer);
 				}
 
-				o.transform.SetParent(parent.transform);
+				o.transform.SetParent(modelParent.transform);
 				if (cancel)
 					break;
 			}
 
-			parent.transform.SetParent(root.transform);
+			// Skeleton... recursion is recursion.
+			foreach (PmxBone rootBone in PmxBone.RootBones(Bones))
+			{
+				GameObject rootBoneObject = BoneHierarchy.BuildHierarchy(rootBone, Bones);
+				rootBoneObject.transform.SetParent(boneParent.transform);
+				rootBoneObject.transform.position = rootBone.Position;
+			}
+
+			modelParent.transform.SetParent(root.transform);
+			boneParent.transform.SetParent(root.transform);
 			if (cancel)
 			{
 				GameObject.Destroy(root);
@@ -523,16 +430,84 @@ namespace PmxSharp
 			return root;
 		}
 
+		// Info
 		/// <summary>
-		/// Scale the imported model by the given factor.
+		/// Compiles a formatted string of human-readable information about the model.
 		/// </summary>
-		/// <param name="factor">The multiplier to scale by.</param>
-		public void Resize(float factor)
+		/// <param name="info">Information fields to include.</param>
+		public string GetInfo(InfoField info)
 		{
-			foreach (PmxVertex v in Vertices)
+			StringBuilder sb = new StringBuilder("Showing info for PMX model\n\n");
+
+			if ((info & InfoField.Header) != 0)
 			{
-				v.Position *= factor;
+				sb.AppendFormat("PMX version {0}\nName: {1} ({2})\n", Version, string.IsNullOrEmpty(NameEnglish) ? "<english name>" : NameEnglish, string.IsNullOrEmpty(NameJapanese) ? "<japanese name>" : NameJapanese)
+					.AppendFormat("\nComments:\n{0}\n{1}\n\nGlobals:\n", string.IsNullOrEmpty(InfoEnglish) ? "<english info>" : InfoEnglish, string.IsNullOrEmpty(InfoJapanese) ? "<japanese info>" : InfoJapanese)
+					.AppendFormat("  Text encoding:        {0}\n", TextEncoding.GetType().ToString())
+					.AppendFormat("  Additional UV count:  {0}\n", AdditionalUVCount)
+					.AppendFormat("Index sizes (byte)\n  Vertex index size:    {0}\n", PmxTypes.VertexIndex)
+					.AppendFormat("  Texture index size:   {0}\n", PmxTypes.VertexIndex)
+					.AppendFormat("  Material index size:  {0}\n", PmxTypes.VertexIndex)
+					.AppendFormat("  Bone index size:      {0}\n", PmxTypes.VertexIndex)
+					.AppendFormat("  Morph index size:     {0}\n", PmxTypes.VertexIndex)
+					.AppendFormat("  Rigidbody index size: {0}\n\n", PmxTypes.VertexIndex);
 			}
+
+			if ((info & InfoField.Vertex) != 0)
+			{
+				sb.AppendFormat("Vertex info\n")
+					.AppendFormat("Count: {0}\n\n", Vertices.Count);
+			}
+
+			if ((info & InfoField.Triangle) != 0)
+			{
+				sb.AppendFormat("Triangle info\n")
+					.AppendFormat("Count: {0}\n\n", Triangles.Count);
+			}
+
+			if ((info & InfoField.Texture) != 0)
+			{
+				sb.AppendFormat("Texture table\n")
+					.AppendFormat("Count: {0}\n", Textures.Count);
+				foreach (string str in Textures)
+					sb.AppendFormat("  {0}\n", str);
+				sb.Append("\n");
+			}
+
+			if ((info & InfoField.Material) != 0)
+			{
+				sb.AppendFormat("Material data\n")
+					.AppendFormat("Count: {0}\n", Materials.Count);
+				foreach (PmxMaterial mat in Materials)
+				{
+					sb.Append(mat.ToString());
+				}
+				sb.Append("\n");
+			}
+
+			if ((info & InfoField.Bone) != 0)
+			{
+				sb.AppendFormat("Bone data\n")
+					.AppendFormat("Count: {0}\n", Bones.Count);
+				foreach (PmxBone bone in Bones)
+				{
+					sb.Append(bone.ToString());
+				}
+				sb.Append("\n");
+			}
+
+			if ((info & InfoField.Morph) != 0)
+			{
+				sb.Append("Morph data\n")
+					.AppendFormat("Count: {0}\n", Morphs.Count);
+				foreach (PmxMorph morph in Morphs)
+				{
+					sb.Append(morph.ToString());
+				}
+				sb.Append("\n");
+			}
+
+			return sb.ToString();
 		}
 
 		public void Dispose()

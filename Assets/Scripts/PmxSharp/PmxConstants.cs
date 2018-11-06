@@ -19,10 +19,10 @@ namespace PmxSharp
 		public static int SignatureLength { get { return 4; } }
 
 		/// <summary>
-		/// Checks whether the file's 4-byte signature is valid.
+		/// Checks whether the PMX file's 4-byte signature is valid.
 		/// </summary>
 		/// <returns>A boolean indicating whether the signature is valid.</returns>
-		public static bool ValidateSignature(this byte[] sig)
+		public static bool ValidatePmxSignature(this byte[] sig)
 		{
 			if (sig.Length < 4)
 				return false;
@@ -37,6 +37,17 @@ namespace PmxSharp
 			if (sig[3] != PmxSignature[3])
 				return false;
 			return true;
+		}
+
+		/// <summary>
+		/// Checks whether the PMD file's 3-byte signature is valid.
+		/// </summary>
+		/// <returns>A boolean indicating whether the signature is valid.</returns>
+		public static bool ValidatePmdSignature(this byte[] sig)
+		{
+			if (sig.Length < 3)
+				return false;
+			else throw new NotImplementedException("Legacy PMD is currently not supported.");
 		}
 	}
 }

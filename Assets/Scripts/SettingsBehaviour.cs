@@ -126,7 +126,14 @@ namespace MUPS
 
 	public class SettingsBehaviour : MonoBehaviour
 	{
-		public static string SavePath { get; set; }
+		public static string SavePath
+		{
+			get
+			{
+				return Path.Combine(Application.persistentDataPath, "settings.xml");
+			}
+		}
+
 		public static SettingsBehaviour Instance { get; private set; }
 
 		public string modelImportPath;
@@ -149,8 +156,6 @@ namespace MUPS
 
 		private void Awake()
 		{
-			SavePath = Path.Combine(Application.persistentDataPath, "settings.xml");
-
 			if (Instance == null)
 			{
 				Instance = this;

@@ -380,7 +380,7 @@ namespace PmxSharp
 	/// <summary>
 	/// Represents a PMX material.
 	/// </summary>
-	public class PmxMaterial
+	public class PmxMaterial : PmxNamedItem
 	{
 		[Flags]
 		public enum MaterialFlags { TwoSided = 1, GroundShadow = 2, CastShadow = 4, ReceiveShadow = 8, Edge = 16, VertexColor = 32, DrawPoints = 64, DrawLines = 128 }
@@ -401,15 +401,13 @@ namespace PmxSharp
 			switch (format)
 			{
 				case TextureInfo.TextureFileFormat.PNG:
-					tex.LoadImage(data);
-					break;
 				case TextureInfo.TextureFileFormat.JPG:
 					tex.LoadImage(data);
 					break;
 				case TextureInfo.TextureFileFormat.TGA:
 					try
 					{
-						tex = TGALoader.LoadTGA(new MemoryStream(data));
+						//tex = TGALoader.LoadTGA(new MemoryStream(data));
 					}
 					catch (EndOfStreamException ex)
 					{
@@ -417,13 +415,14 @@ namespace PmxSharp
 					}
 					break;
 				case TextureInfo.TextureFileFormat.Unknown:
-					throw new FormatException(string.Format("Loaded file {0} is not recognised as a valid image format.", path));
+					break; // throw new FormatException(string.Format("Loaded file {0} is not recognised as a valid image format.", path));
 				default:
-					throw new NotImplementedException(string.Format("The {0} image format is currently not supported (file: {1}).", format, path));
+					break; // throw new NotImplementedException(string.Format("The {0} image format is currently not supported (file: {1}).", format, path));
 			}
 
 			return tex;
 		}
+
 		/// <summary>
 		/// Determines whether the specified material should be treated as transparent or opaque.
 		/// </summary>
@@ -452,63 +451,69 @@ namespace PmxSharp
 		/// Material drawing flags.
 		/// </summary>
 		public MaterialFlags Flags { get; set; }
-		/// <summary>
-		/// Primary name.
-		/// </summary>
-		public string NameJapanese { get; set; }
-		/// <summary>
-		/// Secondary name.
-		/// </summary>
-		public string NameEnglish { get; set; }
+
 		/// <summary>
 		/// Diffuse RGBA color.
 		/// </summary>
 		public Color DiffuseColor { get; set; }
+
 		/// <summary>
 		/// Specular RGB color.
 		/// </summary>
 		public Color SpecularColor { get; set; }
+
 		/// <summary>
 		/// Specular exponent (glossiness, shine).
 		/// </summary>
 		public float SpecularExponent { get; set; }
+
 		/// <summary>
 		/// Ambient/emissive RGB color.
 		/// </summary>
 		public Color AmbientColor { get; set; }
+
 		/// <summary>
 		/// Pencil edge RGB color.
 		/// </summary>
 		public Color EdgeColor { get; set; }
+
 		/// <summary>
 		/// Edge size in pixels.
 		/// </summary>
 		public float EdgeSize { get; set; }
+
 		/// <summary>
 		/// Diffuse texture path. Absolute, or relative to the PMx file.
 		/// </summary>
 		public string DiffuseTexturePath { get; set; }
+
 		/// <summary>
 		/// Sphere map texture path. Absolute, or relative to the PMx file.
 		/// </summary>
 		public string SphereTexturePath { get; set; }
+
 		/// <summary>
 		/// Sphere map blending mode.
 		/// </summary>
+
 		public SphereBlendingMode SphereBlending { get; set; }
 		/// <summary>
 		/// Toon reference type.
 		/// </summary>
+
 		public ToonReferenceType ToonReference { get; set; }
 		/// <summary>
 		/// Index of the internal toon texture (0-9).
 		/// </summary>
+
 		public int ToonInternalIndex { get; set; }
 		/// <summary>
 		/// Path to the external toon texture. Absolute, or relative to the PMx file.
 		/// </summary>
+
 		public string ToonTexturePath { get; set; }
 		private string _note;
+
 		/// <summary>
 		/// Material note content, including directives.
 		/// </summary>
@@ -524,6 +529,7 @@ namespace PmxSharp
 				ReadDirectives();
 			}
 		}
+
 		/// <summary>
 		/// Determines whether at least one of the specified flags is set in the material.
 		/// </summary>
@@ -535,7 +541,11 @@ namespace PmxSharp
 		}
 		#endregion
 		#region Directives
+		/// <summary>
+		/// The collection of material directives to execute.
+		/// </summary>
 		public MaterialDirective[] Directives { get; private set; }
+
 		private void ReadDirectives()
 		{
 			// Do not process the note if [begin] is not found.
@@ -643,37 +653,37 @@ namespace PmxSharp
 			}
 		}
 		#endregion
-		#region Textures
-		private Texture2D _diffuseTexture;
-		private Texture2D _sphereTexture;
-		private Texture2D _toonTexture;
-		public Texture2D DiffuseTexture;
-		#endregion
 		#region Mesh connection
 		/// <summary>
 		/// The number of vertices assigned to the material.
 		/// </summary>
 		public int VertexCount { get; set; }
+
 		/// <summary>
 		/// The index of the first vertex assigned to the material.
 		/// </summary>
 		public int FirstVertex { get; set; }
+
 		/// <summary>
 		/// The index of the last vertex assigned to the material.
 		/// </summary>
 		public int LastVertex { get { return FirstVertex + VertexCount - 1; } }
+
 		/// <summary>
 		/// The number of triangles assigned to the material.
 		/// </summary>
 		public int TriangleCount { get { return VertexCount / 3; } }
+
 		/// <summary>
 		/// The index of the first triangle assigned to the material.
 		/// </summary>
 		public int FirstTriangle { get { return FirstVertex / 3; } }
+
 		/// <summary>
 		/// The index of the last triangle assigned to the material.
 		/// </summary>
 		public int LastTriangle { get { return FirstTriangle + TriangleCount - 1; } }
+
 		/// <summary>
 		/// Returns the array of triangles that belong to this material from a collection of all triangles.
 		/// </summary>
@@ -693,6 +703,7 @@ namespace PmxSharp
 			NameJapanese = string.Format("Material {0}", GetHashCode());
 			NameEnglish = string.Format("Material {0}", GetHashCode());
 		}
+
 		/// <summary>
 		/// Create an empty material with the given names.
 		/// </summary>
@@ -704,5 +715,30 @@ namespace PmxSharp
 			NameEnglish = en;
 		}
 		#endregion
+
+		public override string ToString()
+		{
+			System.Text.StringBuilder sb = new System.Text.StringBuilder("  Material\n");
+			sb
+				.AppendFormat("    Name: {0} ({1})\n    {2}\n", NameEnglish, NameJapanese, Flags)
+				.AppendFormat("    Diffuse:  {0}\n", DiffuseColor)
+				.AppendFormat("    Specular: {0} (gloss {1})\n", SpecularColor, SpecularExponent)
+				.AppendFormat("    Ambient:  {0}\n", AmbientColor)
+				.AppendFormat("    Edge: {0:0.00}px, {1}\n", EdgeSize, EdgeColor)
+				.AppendFormat("    Texture: {0}\n", DiffuseTexturePath)
+				.AppendFormat("    Sphere:  {0}\n", DiffuseTexturePath);
+
+			if (ToonReference == ToonReferenceType.Internal)
+				sb.AppendFormat("    Toon: internal {0}\n", ToonInternalIndex);
+			else
+				sb.AppendFormat("    Toon: {0}\n", ToonTexturePath);
+
+			sb
+				.AppendFormat("    Comment:\n{0}\n", string.IsNullOrEmpty(Note) ? "<no note>" : Note)
+				.AppendFormat("    Triangles: {0} - {1} ({2})\n", FirstTriangle, LastTriangle, TriangleCount)
+				.AppendFormat("    Vertices:  {0} - {1} ({2})\n", FirstVertex, LastVertex, VertexCount);
+
+			return sb.ToString();
+		}
 	}
 }

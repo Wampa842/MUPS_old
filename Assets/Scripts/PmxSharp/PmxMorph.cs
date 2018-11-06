@@ -25,6 +25,12 @@ namespace PmxSharp
 		/// The scale of influence over the indexed morph.
 		/// </summary>
 		public float Scale { get; set; }
+
+		public PmxGroupOffset(int index, float scale)
+		{
+			Index = index;
+			Scale = scale;
+		}
 	}
 
 	/// <summary>
@@ -36,6 +42,12 @@ namespace PmxSharp
 		/// The translation applied to the vertex.
 		/// </summary>
 		public Vector3 Translation { get; set; }
+
+		public PmxVertexOffset(int index, Vector3 translation)
+		{
+			Index = index;
+			Translation = translation;
+		}
 	}
 
 	/// <summary>
@@ -48,25 +60,11 @@ namespace PmxSharp
 		/// </summary>
 		public Vector3 Translation { get; set; }
 		/// <summary>
-		/// The bone's rotation.
+		/// The bone's rotation represented as a quaternion.
 		/// </summary>
 		public Quaternion Rotation { get; set; }
 		/// <summary>
-		/// The real number vector representation of the bone's rotation quaternion.
-		/// </summary>
-		public Vector4 RotationReal
-		{
-			get
-			{
-				return new Vector4(Rotation.x, Rotation.y, Rotation.z, Rotation.w);
-			}
-			set
-			{
-				Rotation = new Quaternion(value.x, value.y, value.z, value.w);
-			}
-		}
-		/// <summary>
-		/// The Euler representation of the bone's rotation.
+		/// The bone's rotation represented as its Euler angles.
 		/// </summary>
 		public Vector3 Euler
 		{
@@ -90,33 +88,42 @@ namespace PmxSharp
 		/// The transformation applied to the UV coordinates.
 		/// </summary>
 		public Vector4 Transform { get; set; }
+
+		public PmxUVOffset(int index, Vector4 transform)
+		{
+			Index = index;
+			Transform = transform;
+		}
+	}
+
+	/// <summary>
+	/// Offset that modifies a material's properties.
+	/// </summary>
+	public class PmxMaterialOffset : PmxMorphOffset
+	{
+		public bool Multiplicative { get; set; }
+		public Color DiffuseTint { get; set; }
+		public Color SpecularTint { get; set; }
+		public float SpecularExponent { get; set; }
+		public Color AmbientTint { get; set; }
+		public Color EdgeTint { get; set; }
+		public float EdgeSize { get; set; }
+		public Color TextureTint { get; set; }
+		public Color SphereTint { get; set; }
+		public Color ToonTint { get; set; }
 	}
 	#endregion
 
 	/// <summary>
 	/// Represents a PMX morph.
 	/// </summary>
-	public class PmxMorph
+	public class PmxMorph : PmxNamedItem
 	{
 		public enum MorphGroup { None = 0, Eyebrow = 1, Eye = 2, Mouth = 3, Other = 4 }
 		public enum MorphType { Group = 0, Vertex = 1, Bone = 2, UV = 3, UV1 = 4, UV2 = 5, UV3 = 6, UV4 = 7, Material = 8, Flip = 9, Impulse = 10 }
 
-		public string NameJapanese { get; set; }
-		public string NameEnglish { get; set; }
 		public MorphGroup Group { get; set; }
 		public MorphType Type { get; set; }
-		public List<PmxMorphOffset> Offsets { get; set; }
-
-		public PmxMorph()
-		{
-			NameJapanese = string.Format("Morph {0}", GetHashCode());
-			NameEnglish = string.Format("Morph {0}", GetHashCode());
-		}
-
-		public PmxMorph(string jp, string en)
-		{
-			this.NameJapanese = jp;
-			this.NameEnglish = en;
-		}
+		public PmxMorphOffset[] Offsets { get; set; }
 	}
 }

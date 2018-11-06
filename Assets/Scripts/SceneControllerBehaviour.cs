@@ -89,6 +89,13 @@ namespace MUPS.Scene
 			}
 
 			gizmoRoot.SelectedModel = Models[Selected].transform;
+
+			foreach (GameObject model in Models)
+			{
+				if (model != Models[Selected])
+					model.GetComponent<PmxModelBehaviour>().OnDeselect();
+			}
+			Models[Selected].GetComponent<PmxModelBehaviour>().OnSelect();
 		}
 
 		public void DeleteSelected()
@@ -120,7 +127,7 @@ namespace MUPS.Scene
 				}
 				catch (Exception ex)
 				{
-					ModalBehaviour.Instance.Show(Screen.width - 200, Screen.height - 200, ex.Message, ex.ToString());
+					Modal.Show(Screen.width - 400, Screen.height - 400, ex.Message, ex.ToString(), ButtonDescriptor.DismissPreset);
 					return null;
 				}
 				finally

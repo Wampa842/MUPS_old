@@ -24,6 +24,7 @@ namespace MUPS.UI
 			public static ColorBlock Blue { get { return new ColorBlock { normalColor = new Color(0.2f, 0.2f, 0.8f), highlightedColor = new Color(0.25f, 0.25f, 0.85f), pressedColor = new Color(0.15f, 0.15f, 0.7f), disabledColor = new Color(0.2f, 0.2f, 0.7f), colorMultiplier = 1, fadeDuration = 0 }; } }
 			public static ColorBlock LightBlue { get { return new ColorBlock { normalColor = new Color(0.675f, 0.825f, 1.0f), highlightedColor = new Color(0.778f, 0.894f, 1.0f), pressedColor = new Color(0.416f, 0.615f, 0.84f), disabledColor = new Color(0.54f, 0.62f, 0.72f), colorMultiplier = 1, fadeDuration = 0 }; } }
 		}
+		public static ButtonDescriptor DismissPreset { get { return new ButtonDescriptor("Dismiss"); } }
 
 		public UnityAction[] Actions { get; }
 		public string Text { get; }
