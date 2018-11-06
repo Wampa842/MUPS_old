@@ -310,11 +310,13 @@ namespace PmxSharp
 
 			GameObject root = new GameObject(Name);
 			GameObject modelParent = new GameObject("Model");
+			GameObject boneParent = new GameObject("Skeleton");
+
 			Material baseOpaque = Resources.Load<Material>("Materials/DefaultMaterial");
 			Material baseTransparent = Resources.Load<Material>("Materials/DefaultMaterialTransparent");
 			Material baseFade = Resources.Load<Material>("Materials/DefaultMaterialFade");
 			Material baseCutout = Resources.Load<Material>("Materials/DefaultMaterialCutout");
-			GameObject boneParent = new GameObject("Skeleton");
+			GameObject boneSpritePrefab = Resources.Load<GameObject>("Prefabs/BoneSprite");
 
 			// Model
 			for (int i = 0; i < Materials.Count; ++i)
@@ -415,13 +417,21 @@ namespace PmxSharp
 			// Skeleton... recursion is recursion.
 			foreach (PmxBone rootBone in PmxBone.RootBones(Bones))
 			{
-				GameObject rootBoneObject = BoneHierarchy.BuildHierarchy(rootBone, Bones);
+				GameObject rootBoneObject = BoneHierarchy.BuildHierarchy(rootBone, Bones, boneSpritePrefab);
 				rootBoneObject.transform.SetParent(boneParent.transform);
 				rootBoneObject.transform.position = rootBone.Position;
 			}
 
 			modelParent.transform.SetParent(root.transform);
 			boneParent.transform.SetParent(root.transform);
+
+			// Release loaded prefabs - source of memory leak? unneeded?
+			//GameObject.Destroy(baseOpaque);
+			//GameObject.Destroy(baseTransparent);
+			//GameObject.Destroy(baseFade);
+			//GameObject.Destroy(baseCutout);
+			//GameObject.Destroy(boneSpritePrefab);
+
 			if (cancel)
 			{
 				GameObject.Destroy(root);

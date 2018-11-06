@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-namespace MUPS.Scene
+namespace PmxSharp
 {
 	public static class PmxModelFinder
 	{
@@ -19,7 +19,7 @@ namespace MUPS.Scene
 			{
 				foreach (GameObject o in AllModels())
 				{
-					if (o.GetComponent<PmxModelBehaviour>().ModelName == name)
+					if (o.GetComponent<PmxModelBehaviour>().modelName == name)
 						return o;
 				}
 			}
@@ -27,7 +27,7 @@ namespace MUPS.Scene
 			{
 				foreach (GameObject o in AllModels())
 				{
-					if (o.GetComponent<PmxModelBehaviour>().ModelName.Contains(name))
+					if (o.GetComponent<PmxModelBehaviour>().modelName.Contains(name))
 						return o;
 				}
 			}
@@ -38,23 +38,20 @@ namespace MUPS.Scene
 		public static GameObject[] FindModelAll(string name, bool exact = false)
 		{
 			if (exact)
-				AllModels().Where(e => e.GetComponent<PmxModelBehaviour>().ModelName == name).ToArray();
-			return AllModels().Where(e => e.GetComponent<PmxModelBehaviour>().ModelName.Contains(name)).ToArray();
+				AllModels().Where(e => e.GetComponent<PmxModelBehaviour>().modelName == name).ToArray();
+			return AllModels().Where(e => e.GetComponent<PmxModelBehaviour>().modelName.Contains(name)).ToArray();
 		}
 	}
 
 	public class PmxModelBehaviour : MonoBehaviour
 	{
-		public string ModelName;
-		public string ModelInfo;
-		public int Index;
-		public Transform BoneParent;
-		public RectTransform BoneSpriteParent;
+		public string modelName;
+		public string modelInfo;
+		public int index;
 
 		public void OnSelect()
 		{
-			GameObject prefab = Resources.Load<GameObject>("Prefabs/GUI/BoneSprite");
-			
+
 		}
 
 		public void OnDeselect()

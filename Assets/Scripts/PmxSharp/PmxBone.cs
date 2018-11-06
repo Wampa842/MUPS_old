@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MUPS.UI;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -7,17 +8,25 @@ namespace PmxSharp
 {
 	public class BoneHierarchy
 	{
-		public static GameObject BuildHierarchy(PmxBone bone, IEnumerable<PmxBone> coll)
+		public static GameObject BuildHierarchy(PmxBone bone, IEnumerable<PmxBone> coll, GameObject sprite)
 		{
-			//GameObject root = new GameObject(bone.Name);
-			GameObject root = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+			GameObject root = GameObject.Instantiate<GameObject>(sprite);
+
+			BoneSpriteBehaviour comp = root.GetComponent<BoneSpriteBehaviour>();
+
+			if (!bone.HasFlag(PmxBone.BoneFlags.Visible))
+				comp.Icon = BoneSpriteBehaviour.IconType.Invisible;
+			else if (bone.HasFlag(PmxBone.BoneFlags.FixedAxis))
+				comp.Icon = BoneSpriteBehaviour.IconType.Twist;
+			else if (bone.HasFlag(PmxBone.BoneFlags.Translation))
+				comp.Icon = BoneSpriteBehaviour.IconType.Translation;
+
 			root.layer = LayerMask.NameToLayer("UISprites");
-			root.transform.localScale = new Vector3(0.03f, 0.03f, 0.03f);
 			root.name = bone.Name;
 			PmxBone[] children = bone.Children(coll);
 			for(int i = 0; i < children.Length; ++i)
 			{
-				GameObject child = BuildHierarchy(children[i], coll);
+				GameObject child = BuildHierarchy(children[i], coll, sprite);
 				child.transform.SetParent(root.transform, true);
 				child.transform.position = children[i].Position - bone.Position;
 			}

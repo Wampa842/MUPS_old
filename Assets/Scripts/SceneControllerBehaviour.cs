@@ -11,6 +11,8 @@ namespace MUPS.Scene
 {
 	public class SceneControllerBehaviour : MonoBehaviour
 	{
+		public static SceneControllerBehaviour Instance { get; private set; }
+
 		public ColorBlock normalButtonColors = new ColorBlock() { normalColor = new Color(1, 1, 1, 0.6f), highlightedColor = new Color(0.95f, 0.95f, 0.95f, 1), pressedColor = new Color(0.8f, 0.8f, 0.8f, 1), disabledColor = new Color(0.8f, 0.8f, 0.8f, 0.5f), colorMultiplier = 1, fadeDuration = 0 };
 
 		public GameObject transformTypeButton;
@@ -66,7 +68,7 @@ namespace MUPS.Scene
 			Models = PmxModelFinder.AllModels();
 			for (int i = 0; i < Models.Length; ++i)
 			{
-				ButtonList.Add(CreateButton(prefab, modelListContent.transform, _buttonHeight, _buttonWidth, i, Models[i].GetComponent<PmxModelBehaviour>().ModelName));
+				ButtonList.Add(CreateButton(prefab, modelListContent.transform, _buttonHeight, _buttonWidth, i, Models[i].GetComponent<PmxModelBehaviour>().modelName));
 			}
 			modelListContent.GetComponentInParent<ScrollRectWithoutDrag>().verticalNormalizedPosition = 1;
 		}
@@ -96,6 +98,7 @@ namespace MUPS.Scene
 					model.GetComponent<PmxModelBehaviour>().OnDeselect();
 			}
 			Models[Selected].GetComponent<PmxModelBehaviour>().OnSelect();
+			DeselectBones();
 		}
 
 		public void DeleteSelected()
@@ -104,6 +107,14 @@ namespace MUPS.Scene
 				GameObject.DestroyImmediate(Models[Selected]);
 			ScanModels();
 			SelectModel(-1);
+		}
+
+		public void DeselectBones()
+		{
+			foreach(BoneSpriteBehaviour b in GetComponentsInChildren<BoneSpriteBehaviour>(true))
+			{
+				b.Deselect();
+			}
 		}
 
 		public GameObject LoadFile(string path)
@@ -120,7 +131,7 @@ namespace MUPS.Scene
 					import = new PmxImport(path);
 					import.Resize(0.1f);
 					GameObject pmx = import.GetGameObject();
-					pmx.AddComponent<PmxModelBehaviour>().ModelName = import.Name;
+					pmx.AddComponent<PmxModelBehaviour>().modelName = import.Name;
 					pmx.transform.SetParent(GameObject.Find("/SCENE").transform);
 
 					return pmx;
@@ -154,6 +165,16 @@ namespace MUPS.Scene
 
 		private void Awake()
 		{
+			if (Instance == null)
+			{
+				Instance = this;
+			}
+			else if(Instance != this)
+			{
+				Destroy(Instance);
+				Instance = this;
+			}
+
 			_selectedButtonColors = normalButtonColors;
 			_selectedButtonColors.colorMultiplier = 0.6f;
 
