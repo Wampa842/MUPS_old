@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MUPS.UI;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -318,15 +319,29 @@ namespace PmxSharp
 			Material baseCutout = Resources.Load<Material>("Materials/DefaultMaterialCutout");
 			GameObject boneSpritePrefab = Resources.Load<GameObject>("Prefabs/BoneSprite");
 
+			List<Transform> boneObjectList = new List<Transform>();
+
+			// Skeleton... recursion is recursion.
+			foreach (PmxBone rootBone in PmxBone.RootBones(Bones))
+			{
+				GameObject rootBoneObject = BoneHierarchy.BuildHierarchy(rootBone, Bones, boneObjectList, boneSpritePrefab);
+				boneObjectList.Add(rootBoneObject.transform);
+				rootBoneObject.transform.SetParent(boneParent.transform);
+				rootBoneObject.transform.position = rootBone.Position;
+			}
+
 			// Model
 			for (int i = 0; i < Materials.Count; ++i)
 			{
 				PmxMaterial mat = Materials[i];
+				GameObject o = new GameObject(string.Format("{0} ({1})", Name, mat.NameJapanese));
 
 				// MESH
 
 				List<PmxVertex> vert = new List<PmxVertex>();   // List of vertices that make up the sub-model
 				List<int> tri = new List<int>();                // Every index corresponds to an index in vert
+				List<BoneWeight> weights = new List<BoneWeight>();
+				List<Matrix4x4> bindposes = new List<Matrix4x4>();
 				foreach (PmxTriangle t in mat.Triangles(Triangles))
 				{
 					vert.Add(Vertices[t.Vertex1]);
@@ -335,6 +350,12 @@ namespace PmxSharp
 					tri.Add(vert.Count - 1);
 					vert.Add(Vertices[t.Vertex3]);
 					tri.Add(vert.Count - 1);
+					weights.Add(Vertices[t.Vertex1].DeformData.GetUnityWeight());
+					bindposes.Add(boneObjectList[weights[weights.Count - 1].boneIndex0].worldToLocalMatrix);
+					weights.Add(Vertices[t.Vertex2].DeformData.GetUnityWeight());
+					bindposes.Add(boneObjectList[weights[weights.Count - 1].boneIndex0].worldToLocalMatrix);
+					weights.Add(Vertices[t.Vertex3].DeformData.GetUnityWeight());
+					bindposes.Add(boneObjectList[weights[weights.Count - 1].boneIndex0].worldToLocalMatrix);
 				}
 
 				Mesh mesh = new Mesh();
@@ -343,6 +364,16 @@ namespace PmxSharp
 				mesh.normals = PmxVertex.GetNormals(vert).ToArray();
 				mesh.uv = PmxVertex.GetUVs(vert).ToArray();
 				mesh.triangles = tri.ToArray();
+				mesh.boneWeights = weights.ToArray();
+				mesh.bindposes = bindposes.ToArray();
+				o.AddComponent<MeshFilter>().sharedMesh = mesh;
+				SkinnedMeshRenderer renderer = o.AddComponent<SkinnedMeshRenderer>();
+				renderer.sharedMesh = mesh;
+				renderer.updateWhenOffscreen = true;
+				renderer.bones = boneObjectList.ToArray();
+
+				// SKELETON
+
 
 				// MATERIAL
 
@@ -396,9 +427,6 @@ namespace PmxSharp
 				}
 
 				// Set up GameObject and components
-				GameObject o = new GameObject(string.Format("{0} ({1})", Name, mat.NameJapanese));
-				o.AddComponent<MeshFilter>().sharedMesh = mesh;
-				MeshRenderer renderer = o.AddComponent<MeshRenderer>();
 				renderer.sharedMaterial = material;
 				renderer.shadowCastingMode = mat.HasFlag(PmxMaterial.MaterialFlags.CastShadow | PmxMaterial.MaterialFlags.GroundShadow) ? ShadowCastingMode.On : ShadowCastingMode.Off;
 				//renderer.receiveShadows = mat.HasFlag(PmxMaterial.MaterialFlags.ReceiveShadow);
@@ -412,14 +440,6 @@ namespace PmxSharp
 				o.transform.SetParent(modelParent.transform);
 				if (cancel)
 					break;
-			}
-
-			// Skeleton... recursion is recursion.
-			foreach (PmxBone rootBone in PmxBone.RootBones(Bones))
-			{
-				GameObject rootBoneObject = BoneHierarchy.BuildHierarchy(rootBone, Bones, boneSpritePrefab);
-				rootBoneObject.transform.SetParent(boneParent.transform);
-				rootBoneObject.transform.position = rootBone.Position;
 			}
 
 			modelParent.transform.SetParent(root.transform);

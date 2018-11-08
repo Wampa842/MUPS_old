@@ -8,9 +8,11 @@ namespace PmxSharp
 {
 	public class BoneHierarchy
 	{
-		public static GameObject BuildHierarchy(PmxBone bone, IEnumerable<PmxBone> coll, GameObject sprite)
+		public static GameObject BuildHierarchy(PmxBone bone, IEnumerable<PmxBone> coll, List<Transform> appendList, GameObject sprite)
 		{
 			GameObject root = GameObject.Instantiate<GameObject>(sprite);
+			appendList.Add(root.transform);
+			bone.UnityObject = root;
 
 			BoneSpriteBehaviour comp = root.GetComponent<BoneSpriteBehaviour>();
 
@@ -26,7 +28,7 @@ namespace PmxSharp
 			PmxBone[] children = bone.Children(coll);
 			for(int i = 0; i < children.Length; ++i)
 			{
-				GameObject child = BuildHierarchy(children[i], coll, sprite);
+				GameObject child = BuildHierarchy(children[i], coll, appendList, sprite);
 				child.transform.SetParent(root.transform, true);
 				child.transform.position = children[i].Position - bone.Position;
 			}
@@ -116,6 +118,11 @@ namespace PmxSharp
 		/// If the IK flag is set, specifies the properties of the IK chain.
 		/// </summary>
 		public PmxIK IK { get; set; }
+
+		/// <summary>
+		/// GameObject reference that represents the bone in a Unity scene. Null until the bone hierarchy is built.
+		/// </summary>
+		public GameObject UnityObject { get; set; }
 
 		/// <summary>
 		/// Create an empty bone with unique random names.

@@ -12,6 +12,7 @@ namespace PmxSharp
 	public interface IPmxVertexDeform
 	{
 		DeformType Type { get; }
+		BoneWeight GetUnityWeight();
 	}
 
 	/// <summary>
@@ -28,6 +29,7 @@ namespace PmxSharp
 		}
 
 		public int Bone { get; set; }
+		
 
 		public Bdef1Deform()
 		{
@@ -37,6 +39,11 @@ namespace PmxSharp
 		public Bdef1Deform(int bone)
 		{
 			this.Bone = bone;
+		}
+
+		public BoneWeight GetUnityWeight()
+		{
+			return new BoneWeight { boneIndex0 = Bone, weight0 = 1.0f };
 		}
 	}
 
@@ -107,6 +114,11 @@ namespace PmxSharp
 		{
 			this.Weight1 = weight1;
 		}
+
+		public BoneWeight GetUnityWeight()
+		{
+			return new BoneWeight { boneIndex0 = Bone1, boneIndex1 = Bone2, weight0 = Weight1, weight1 = Weight2 };
+		}
 	}
 
 	/// <summary>
@@ -154,6 +166,21 @@ namespace PmxSharp
 		/// The fourth bone's weight.
 		/// </summary>
 		public float Weight4 { get; set; }
+
+		public BoneWeight GetUnityWeight()
+		{
+			return new BoneWeight
+			{
+				boneIndex0 = Bone1,
+				boneIndex1 = Bone2,
+				boneIndex2 = Bone3,
+				boneIndex3 = Bone4,
+				weight0 = Weight1,
+				weight1 = Weight2,
+				weight2 = Weight3,
+				weight3 = Weight4
+			};
+		}
 	}
 
 	/// <summary>
@@ -201,6 +228,21 @@ namespace PmxSharp
 		/// The fourth bone's weight.
 		/// </summary>
 		public float Weight4 { get; set; }
+
+		public BoneWeight GetUnityWeight()
+		{
+			return new BoneWeight
+			{
+				boneIndex0 = Bone1,
+				boneIndex1 = Bone2,
+				boneIndex2 = Bone3,
+				boneIndex3 = Bone4,
+				weight0 = Weight1,
+				weight1 = Weight2,
+				weight2 = Weight3,
+				weight3 = Weight4
+			};
+		}
 	};
 
 	/// <summary>
@@ -251,6 +293,11 @@ namespace PmxSharp
 		/// Unknown variable - probably a radius vector.
 		/// </summary>
 		public Vector3 R1 { get; set; }
+
+		public BoneWeight GetUnityWeight()
+		{
+			throw new System.NotImplementedException();
+		}
 	}
 	#endregion
 
@@ -337,6 +384,20 @@ namespace PmxSharp
 				output.Add(v.UV);
 			}
 			return output;
+		}
+		/// <summary>
+		/// Return the BoneWeight structures from a collection of vertices.
+		/// </summary>
+		/// <param name="coll"></param>
+		/// <returns></returns>
+		public static List<BoneWeight> GetUnityWeights(IEnumerable<PmxVertex> coll)
+		{
+			List<BoneWeight> list = new List<BoneWeight>();
+			foreach(PmxVertex v in coll)
+			{
+				list.Add(v.DeformData.GetUnityWeight());
+			}
+			return list;
 		}
 	}
 }
